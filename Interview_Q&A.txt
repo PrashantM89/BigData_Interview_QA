@@ -1,0 +1,130 @@
+1) Spark v1 vs v2:
+- Structured streaming in v2.
+- DataSet and DataFrame APIs will be merged in v2.
+- In v1,to connect to SQL we required SQLContext and StreamContext for Streaming. SparkSession provides a single entry point for DataFrame and DataSet API for Spark. For now SparkSession will cover SQLContext & HiveContext. It will be extended to StreamContext as well.
+- Spark 2.0 includes the second generation Tungsten engine.The engine uses the CPU register for storing the intermediate data (unlike the traditional method of using memory for storing intermediate data).
+
+2) Dataset vs Dataframe vs RDD:
+ Dataset:-
+ 1. Datasets in Apache Spark are an extension of DataFrame API which provides type-safe, object-oriented programming interface.
+ 2. It overcomes the limitation of DataFrame to regenerate the RDD from Dataframe. Datasets allow you to convert your existing RDD and DataFrames into Datasets.
+ 
+ 
+3) How to create Dataframe from RDD:
+	val dfWithSchema = spark.createDataFrame(rdd).toDF("id", "vals")
+	
+4) Spark Stages:
+	Tasks that can be done in parallel are merged in one stage. A stage is a set of parallel tasks. Stages are separated by shuffles. A stage is a set of independent tasks all computing the same function that need to run as part of a Spark job.
+
+5) DAG in spark:
+	When any action is called on the RDD, Spark creates the DAG and submits it to the DAG scheduler. Each Spark job creates a DAG of task stages to be performed on the cluster. Compared to MapReduce, which creates a DAG with two predefined stages - Map and Reduce, DAGs created by Spark can contain any number of stages.
+	
+6) Types of transformation in Spark:
+	1. Narrow Transformation - It doesn't require the data to be shuffled across the partitions. for example, Map, filter etc. The narrow transformations will be grouped together into a single stage.
+	2. Wide Transformation - It requires the data to be shuffled for example, reduceByKey etc..	
+
+7) What is Lineage in Spark:
+	For example, when we call val b = a.map() on a RDD, the RDD b keeps a reference to its parent a, that's a lineage. To display the lineage of an RDD, Spark provides a debug method toDebugString()
+
+8) Types of RDD:
+	1. DoubleRDD
+	2. PairRDD
+	3. OrderedRDD
+	4. SequenceFileRDD
+
+9) Difference between RDD and Pair RDD:
+	Pair RDD is just a way of referring to an RDD containing key/value pairs, i.e. tuples of data.
+	
+10) RDD lineage:
+	RDD dependency graph is a graph of all the parent RDDs of a RDD. It is built as a result of applying transformations to the RDD
+	
+11) Caching vs Persist:
+	Caching is a type of persistence with StorageLevel -MEMORY_ONLY.	
+
+12) Accumulator:
+	Accumulators, as the name suggests accumulates data during execution. This is similar to Counters in Hadoop MapReduce. An accumulator is initialized at the driver and is then modified (added) by each executors. Finally all these values are aggregated back at the driver.	
+
+13) groupByKey vs reduceByKey vs aggregateByKey:
+	groupByKey - It can cause out of disk problems as data is sent over the network and collected on the reduce workers.
+	reduceByKey - Data is combined at each partition , only one output for one key at each partition to send over network.
+	aggregateByKey  - Same as reduceByKey, which takes an initial value.  It lets you return result in different type. In another words, it lets you have a input as type x and aggregate result as type y.
+
+14) Mapside join(Broadcast join):
+	Broadcast join can be very efficient for joins between a large table (fact) with relatively small tables. It can avoid sending all data of the large table over the network.
+
+15) Vectorization in Hive:
+	Vectorized query execution improves performance of operations like scans, aggregations, filters and joins, by performing them in batches of 1024 rows at once instead of single row each time.
+	Introduced in Hive 0.13, this feature significantly improves query execution time, and is easily enabled with two parameters settings:
+	set hive.vectorized.execution.enabled = true;
+	set hive.vectorized.execution.reduce.enabled = true;	
+	
+16) Can we change replication factor dynamically while running MR jobs:
+
+17)	What if file size are small:
+
+18) Static and Dynamic partitions in Hive:
+
+19) Why Kafka doesn't keep file in HDFS:
+	1) If NameNode down so no file available.
+	2) Double replication of files. one by Kafka and other by HDFS.
+
+20) Where does Kafka store topics, in RAM or DISK:
+
+21) 1 mapper = 1 input split. Input split can contain data from multiple blocks.
+
+22) Hadoop, change properties from command line:
+	1.	hadoop fs -Ddfs.blocksize=134217728 -put abc.txt /path/in/hdfs -> Change block size.
+	2.	hadoop fs -Ddfs.relication=1 -copyFromLocal abc.txt /path/in/hdfs -> Change replication factor of this file.
+	3. 	hadoop fs -setrep 2 /path/of/file.txt ->  change replication factor of existing file.
+
+23) Types of InputFormat in Hadoop: InputFormat defines how to split and read input files. 
+	1. FileInputFormat - It is the base class for all file-based InputFormats.
+	2. TextInputFormat - It is the default InputFormat of MapReduce.
+	3. KeyValueTextInputFormat - It is similar to TextInputFormat as it also treats each line of input as a separate record. While TextInputFormat treats 
+		entire line as the value, but the KeyValueTextInputFormat breaks the line itself into key and value by a tab character (‘/t’). 
+	4. SequenceFileInputFormat - Hadoop SequenceFileInputFormat is an InputFormat which reads sequence files. 
+	5. DBInputFormat - Hadoop DBInputFormat is an InputFormat that reads data from a relational database, using JDBC.
+
+24) Log location in Yarn:
+	Container logs for a particular application, will be found in the folder "e:\hdpdata\hadoop\logs\ {application-id} \ {container-id}", in the Node Manager machine, where the Application Master ran.
+
+25) How to optimize shuffle and sort phase:
+	You can do the following to achieve the Shuffle and Sort efficiency:
+
+	1.	Combiner: Using combiner will reduce the amount of data transferred to each of the the reducers, since combiner merges the output on the mapper side.
+	2.	Number of reducers: Choose optimal number of reducers. If data size is huge, then one reducer is not a good idea. Also, setting the number of reducers to a high number, is not a good idea, since the number of reducers also determines the number of partitions on the mapper side. Look at the link here: https://github.com/paulhoule/infovore/wiki/Choosing-the-number-of-reducers
+	3.	When to start the reducers: You can control, when the reduce tasks are started. This is determined by configuration mapreduce.job.reduce.slowstart.completedmaps in YARN. It will not start the reducers until a certain percentage of mappers are completed. It is by default set to "0.05" (It means reducers start after 5% of mappers are completed). If the reducers are started early, then most of the reducers are idle, till all the mappers are completed. Also, the reducers may consume the slots, which could otherwise be used by the mappers for processing. By controlling this, you can use the mapper/reducers slots optimally and improve the time spent during the shuffle.
+	4.	Compress Mapper Output: Its recommended to compress the mapper outputs (determined by configuration: mapreduce.map.output.compress), so that lesser data gets written to disk and gets transferred to reducers.
+	
+26) Node Manager and Data Node correlation
+
+	There is 1:1 correlation between number of Node Managers and Data Nodes.
+
+	1.	Node Managers manage the containers requested by jobs
+	2.	Data Nodes manage the data
+
+27) To ensure the availability and durability of data, Hadoop places replicas in 3 different Data Nodes:
+
+	1.	Local Data Node: The Data Node where the client initiates a write (for e.g. using hadoop fs -cp command). The first replica is placed here. If the client is writing the data from outside the cluster, then this node is chosen at random. It is the node on which the first replica gets written.
+	2.	Off-rack Data Node: The Data Node, which is present on another rack. The second replica is placed here.
+	3.	On-Rack Data Node: The Data Node which is physically present on the same rack as the first Data Node. Third replica is placed here
+	
+30) Where is topic data stored:
+		Data written to Kafka is written to disk and replicated for fault-tolerance. Kafka allows producers to wait on acknowledgement so that a write isn't considered complete until it is fully replicated and guaranteed to persist even if the server written to fails.
+
+31) Max number of partition:
+	The maximum number of partitions that can be created by default is 200. We can increase this number by using the following queries:
+ 
+	set hive.exec.max.dynamic.partitions=1000;
+	
+32) HDFS commands:
+	1.	hadoop fsadmin -report => To know HDFS disc usage.
+	2.	hadoop fs -copyToLocal
+	3.  hadoop fs -distCP => To copy huge file
+	4.  hadoop -fs expunge => To empty Trash.
+
+33) If a DataNode is marked as decommissioned, can it be used for replication?
+	No, it can only be used for reading .
+
+34) Safe mode in Hadoop:
+	A state in which NN does not perform replication or deletion of blocks
